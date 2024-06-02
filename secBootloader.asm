@@ -10,9 +10,17 @@ start2:
     mov ss, ax
     mov sp, 0x7C00
 
+	; write success boot 2 message
+	mov si, sec_bootloader_success_load_str
+	call print_string
+
 
 	; check for pci buss
 	call pci_exists_check
+	; check cpuid command exists
+	call check_cpuid_availability
+	; get cpu information
+	call get_cpu_info
     ; Load kernel
     mov bx, 0x1000              ; Segment we want to load the kernel to
     mov es, bx
@@ -50,8 +58,53 @@ load_kernel_err:
 hang:
     jmp hang                    ;Infinite loop
 
-include './printString.asm'
 
+;Prior to using the CPUID instruction, you should also make sure the processor supports it by testing the 'ID' bit (0x200000) in eflags. This bit is modifiable only when the CPUID instruction is supported. For systems that don't support CPUID, changing the 'ID' bit will have no effect.
+check_cpuid_availability:
+	pushfd                      ;Save EFLAGS to the stack
+	pop eax                     ;Load EFLAGS to eax
+	mov ecx, eax                ;Copy eax to ecx
+	xor eax, 0x00200000         ;Toggle the ID bit in EFLAGS
+	push eax                    ;Save modified flags to stack
+	popfd                       ;Restore modified EFLAGS
+	pushfd                      ;Save EFLAGS to the stack again
+	pop eax                     ;Load modified EFLAGS to eax
+	xor eax, ecx                ;should be not 0 because they are different
+	jz cpuid_command_not_present
+cpuid_present:
+	mov si, cpuid_available_str
+	call print_string
+	jmp cpuid_command_checked
+cpuid_command_not_present:
+	mov si, cpuid_not_supported_command_string
+	call print_string
+cpuid_command_checked:
+	ret
+
+;Get cpu information
+;When called with EAX = 0, CPUID returns the vendor ID string in EBX, EDX and ECX. Writing these to memory in this order results in a 12-character string.
+get_cpu_info:
+	mov eax, 0x0
+	cpuid                      ;now that we know it exists, we call it
+	mov [cpu_vendor_info_str+0],ebx
+	mov [cpu_vendor_info_str+4],edx
+	mov [cpu_vendor_info_str+8],ecx
+	mov si, cpu_vendor_msg_str
+	call print_string
+	mov si, cpu_vendor_info_str
+	call print_string
+	ret
+
+
+
+
+
+
+include './printString.asm'
+cpu_vendor_msg_str: db 'CPU vendor: ',0
+cpu_vendor_info_str: db 12 dup(0),0xA,0xD,0
+cpuid_available_str: db 'CPUID command is available.', 0xA, 0xD,0
+cpuid_not_supported_command_string: db 'CPUID command is not supported',0xA,0xD,0
 load_error_msg: db 'Error loading kernel!!', 0xA, 0xD, 0
 pci_exists_string: db 'Pci exists!',0xA,0xD,0
 pci_not_exists_string: db 'Pci doesnt exist!',0xA,0xD,0
@@ -71,6 +124,7 @@ pci_not_present:
 pci_checked:
 	ret
 
-
+sec_bootloader_success_load_str: db 'bootloader 2 loaded Successfully',0xA,0xD,0
 times 1024-($-$$) db 0  ; Fill the rest of the sector with zeros
+
 

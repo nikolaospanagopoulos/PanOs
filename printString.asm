@@ -3,8 +3,9 @@
 
 print_string:
 	pusha 
-
+	call print
 	popa
+	ret
 print:
 	mov bx, 0
 .loop:
