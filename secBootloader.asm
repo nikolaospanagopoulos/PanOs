@@ -30,7 +30,7 @@ set_up_read_disk:
     mov dh, 0x00                ; Head 0
     mov dl, 0x00                ; Drive 0x80 (first hard drive)
     mov ch, 0x00                ; Cylinder 0
-    mov cl, 0x04                ; Starting sector to read from (sector 4) (make second bootloader 1024 bytes for extra space)
+    mov cl, 0x05                ; Starting sector to read from (sector 5) (make second bootloader 1536 bytes for extra space)
 
 read_disk:
     mov ah, 0x02                ; BIOS function to read sectors
@@ -85,22 +85,42 @@ cpuid_command_checked:
 ;When called with EAX = 0, CPUID returns the vendor ID string in EBX, EDX and ECX. Writing these to memory in this order results in a 12-character string.
 get_cpu_info:
 	mov eax, 0x0
-	cpuid                      ;now that we know it exists, we call it
-	mov [cpu_vendor_info_str+0],ebx
-	mov [cpu_vendor_info_str+4],edx
-	mov [cpu_vendor_info_str+8],ecx
+	cpuid                                ;now that we know it exists, we call it
+	mov [cpu_vendor_info_str+0],ebx      ;
+	mov [cpu_vendor_info_str+4],edx      ;BUILD VENDOR STR
+	mov [cpu_vendor_info_str+8],ecx      ;
 	mov si, cpu_vendor_msg_str
 	call print_string
 	mov si, cpu_vendor_info_str
+	call print_string
+	call get_cpu_stepping
+	ret
+
+;Get cpu stepping
+get_cpu_stepping:
+	mov eax, 1                           ;CPUID function 1: Processor info and features
+	cpuid
+	and eax, 0x0000000F                  ;mask everything but the stepping
+	cmp al, 9
+	jle convert_to_digit
+	add al, 'A'-10                       ;convert it to ascii (if >=10 add 55)
+	jmp store_stepping
+convert_to_digit:
+	add al, '0'                          ;convert it to ascii (if<10 add 48(0))
+store_stepping:
+	mov [cpu_stepping_val_str],al
+	mov si, cpu_vendor_msg_str
+	call print_string
+	mov si, cpu_stepping_val_str
 	call print_string
 	ret
 
 
 
 
-
-
 include './printString.asm'
+cpu_stepping_msg_str: db 'CPU stepping: ',0
+cpu_stepping_val_str: db 1 dup(0), 0xA, 0xD, 0
 cpu_vendor_msg_str: db 'CPU vendor: ',0
 cpu_vendor_info_str: db 12 dup(0),0xA,0xD,0
 cpuid_available_str: db 'CPUID command is available.', 0xA, 0xD,0
@@ -125,6 +145,6 @@ pci_checked:
 	ret
 
 sec_bootloader_success_load_str: db 'bootloader 2 loaded Successfully',0xA,0xD,0
-times 1024-($-$$) db 0  ; Fill the rest of the sector with zeros
+times 1536-($-$$) db 0  ; Fill the rest of the sector with zeros
 
 
