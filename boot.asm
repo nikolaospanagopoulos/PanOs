@@ -9,6 +9,12 @@ mov es, ax                      ;set es to 0x0000
 mov ss, ax
 mov sp, 0x7c00
 
+;check if pci exists
+call pci_exists_check
+
+
+
+
 	
 ;set up reading from disk
 start:
@@ -46,9 +52,22 @@ load_kernel_err:
 include './printString.asm'
 load_error_msg: db 'Error loading kernel!!',0xA,0xD,0
 
+pci_exists_string: db 'Pci exists!',0xA,0xD,0
+pci_not_exists_string: db 'Pci doesnt exist!',0xA,0xD,0
 
-
-
+pci_exists_check:              ;check pci bus exists
+	mov ax, 0xB101             ;0xB101 function
+	int 0x1A                   ;BIOS int 0x1A
+	jc pci_not_present         ;if carry flag is set, pci doesnt exist
+pci_present:
+	mov si, pci_exists_string
+	call print_string
+	jmp pci_checked
+pci_not_present:
+	mov si, pci_not_exists_string
+	call print_string
+pci_checked:
+	ret
 
 
 ;Print a char for testing
