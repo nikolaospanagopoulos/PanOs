@@ -15,7 +15,7 @@ mov ax, 0x0000              ;
 mov es, ax                  ;es:bx 0x0000:0x0800
 mov bx, 0x0800              ;
 mov ah, 0x02                ;BIOS function to read sectors
-mov al, 0x01                ;number of sectors to read (512 bytes)
+mov al, 0x04                ;number of sectors to read (512 bytes each sector)
 mov dh, 0x0                 ;head 0
 mov dl, 0x0                 ;drive 0
 mov ch, 0x0                 ;cylinder 0

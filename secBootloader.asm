@@ -11,9 +11,11 @@ start2:
     mov sp, 0x7C00
 
     ; Write success boot 2 message
-    mov si, sec_bootloader_success_load_str
-    call print_string
+	mov si, sec_bootloader_success_load_str
+	call print_string
 
+	; Enable A20 line
+	call enable_a20_line
     ; Check for PCI bus
     call pci_exists_check
     ; Check CPUID command exists
@@ -32,7 +34,7 @@ set_up_read_disk:
     mov dh, 0x00                ; Head 0
     mov dl, 0x00                ; Drive 0x80 (first hard drive)
     mov ch, 0x00                ; Cylinder 0
-    mov cl, 0x05                ; Starting sector to read from (sector 5)
+    mov cl, 0x06                ; Starting sector to read from (sector 5)
 
 read_disk:
     mov ah, 0x02                ; BIOS function to read sectors
@@ -98,6 +100,7 @@ get_cpu_info:
     ret
 
 pci_exists_check:
+	pusha
     mov ax, 0xB101             ; 0xB101 function
     int 0x1A                   ; BIOS int 0x1A
     jc pci_not_present         ; If carry flag is set, PCI doesn't exist
@@ -113,6 +116,7 @@ pci_not_present:
     jmp hang
 
 pci_checked:
+	popa
     ret
 
 msr_is_supported_check:
@@ -135,9 +139,9 @@ end_check:
 
 ;Get cpu stepping
 get_cpu_stepping:
-	mov ax, 1                           ;CPUID function 1: Processor info and features
+	mov ax, 1                            ;CPUID function 1: Processor info and features
 	cpuid
-	and ax, 0x000F                  ;mask everything but the stepping
+	and ax, 0x000F                       ;mask everything but the stepping
 	cmp al, 9
 	jle convert_to_digit
 	add al, 'A'-10                       ;convert it to ascii (if >=10 add 55)
@@ -152,6 +156,14 @@ store_stepping:
 	call print_string
 	ret
 
+;Enable A20 line
+enable_a20_line:
+	in al, 0x92                          ;read current value from port 0x92
+    or al, 2                             ;set the second bit to enable A20 line
+    out 0x92, al                         ;write the new value back to 0x92 port
+	mov si, a20_line_enabled_str
+	call print_string
+	ret
 
 include './printString.asm'
 
@@ -162,11 +174,23 @@ cpu_vendor_info_str: db 12 dup(0), 0xA, 0xD, 0
 cpuid_available_str: db 'CPUID command is available.', 0xA, 0xD, 0
 cpuid_not_supported_command_string: db 'CPUID command is not supported', 0xA, 0xD, 0
 load_error_msg: db 'Error loading kernel!!', 0xA, 0xD, 0
-pci_exists_string: db 'PCI exists!', 0xA, 0xD, 0
+pci_exists_string: db 'PCI exists', 0xA, 0xD, 0
 pci_not_exists_string: db 'PCI doesnt exist!', 0xA, 0xD, 0
 msr_supported_str: db 'MSR is supported', 0xA, 0xD, 0
 msr_not_supported_str: db 'MSR is not supported', 0xA, 0xD, 0
-sec_bootloader_success_load_str: db 'Bootloader 2 loaded successfully', 0xA, 0xD, 0
+sec_bootloader_success_load_str: db 'Second Bootloader Loaded Successfully', 0xA, 0xD, 0
+a20_line_enabled_str: db 'A20 line enabled successfully', 0xA , 0xD , 0
 
-times 1536-($-$$) db 0  ; Fill the rest of the sector with zeros
+
+
+
+
+
+
+
+
+
+
+
+times 2048-($-$$) db 0  ; Fill the rest of the sector with zeros
 
