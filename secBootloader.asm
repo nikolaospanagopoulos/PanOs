@@ -21,6 +21,7 @@ start2:
 	call check_cpuid_availability
 	; get cpu information
 	call get_cpu_info
+	call msr_is_supported_check
     ; Load kernel
     mov bx, 0x1000              ; Segment we want to load the kernel to
     mov es, bx
@@ -143,6 +144,27 @@ pci_not_present:
 	jmp hang
 pci_checked:
 	ret
+
+msr_is_supported_check:
+	mov eax, 1
+	cpuid
+	test edx, 0x00000020 ;000100000 (check if bit 5 is set)
+	jz msr_not_supported            ;msr is not supported
+msr_is_supported:
+	mov si, msr_supported_str
+	call print_string
+	jmp end_check
+msr_not_supported:
+	mov si, msr_not_supported_str
+	call print_string
+end_check:
+	ret
+
+	         
+msr_supported_str: db 'MSR is supported',0xA,0xD,0
+msr_not_supported_str: db 'MSR is not supported',0xA,0xD,0
+
+
 
 sec_bootloader_success_load_str: db 'bootloader 2 loaded Successfully',0xA,0xD,0
 times 1536-($-$$) db 0  ; Fill the rest of the sector with zeros
