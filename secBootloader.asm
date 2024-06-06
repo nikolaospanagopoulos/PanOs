@@ -11,7 +11,7 @@ start2:
 
     ; Set up the stack (downwards)
     mov ss, ax
-    mov sp, 0x7C00
+    mov sp, 0x9FFF
 
     ; Write success boot 2 message
 	mov si, sec_bootloader_success_load_str
@@ -35,22 +35,15 @@ step2:
     mov ds, ax
     mov es, ax
     mov ss, ax
-    mov sp, 0x7c00             ; Stack pointer
+    mov sp, 0x9FFF             ; Stack pointer
 	sti
 .load_protected:
 	cli
 	lgdt[gdt_descriptor]
-
-   mov eax, cr0
-   or eax, 0x1
-   mov cr0, eax
-   jmp CODE_SEG:load32
-
-
-
-    ; Your 32-bit code starts here
-    ; ...
-
+    mov eax, cr0
+    or eax, 0x1
+    mov cr0, eax
+    jmp CODE_SEG:load32
 hang:
     jmp hang                    ; Infinite loop to prevent falling off
 
@@ -247,9 +240,10 @@ load32:
     mov ds, ax
     mov es, ax
 
+	; Access 32 bit registers
     ; Print the string
-    mov esi, xazo              ; Source index pointing to string
-    mov edi, 0xB8000           ; Destination index pointing to VGA memory
+    mov esi, protected_mode_success_str             ;Source index pointing to string
+    mov edi, 0xB8000                                ;Destination index pointing to VGA memory
     call pm_print_string
 
     ; Hang
@@ -271,7 +265,7 @@ pm_print_string:
     ret
 
 
-xazo: db 'hello',0xA,0xD,0
+protected_mode_success_str: db 'We are in Protected mode!',0xA,0xD,0
 
 
 
