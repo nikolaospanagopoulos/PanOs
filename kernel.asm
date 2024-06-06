@@ -1,8 +1,10 @@
-mov si, kernelStatusString
-call print_string
-mov si, welcomeString
-call print_string
-jmp $
+kernel:
+
+	mov si, kernelStatusString
+	call print_string
+	mov si, welcomeString
+	call print_string
+	jmp $
 
 
 

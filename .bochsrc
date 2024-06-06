@@ -1,0 +1,4 @@
+floppya: 1_44=OS.bin, status=inserted
+#display_library: sdl
+megs: 1
+boot: a

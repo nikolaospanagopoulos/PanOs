@@ -1,5 +1,8 @@
 org 0x0800
 
+CODE_SEG equ gdt_code - gdt
+DATA_SEG equ gdt_data_segment - gdt
+
 start2:
     ; Set up segment registers
     xor ax, ax                      ; Clear AX register
@@ -14,8 +17,6 @@ start2:
 	mov si, sec_bootloader_success_load_str
 	call print_string
 
-	; Enable A20 line
-	call enable_a20_line
     ; Check for PCI bus
     call pci_exists_check
     ; Check CPUID command exists
@@ -24,6 +25,35 @@ start2:
     call get_cpu_info
     ; Check if MSR is supported
     call msr_is_supported_check
+	; Enable A20 line
+	call enable_a20_line
+
+	 ; Enter Protected Mode
+step2:
+	cli
+    mov ax, 0x00                ; Data segment selector
+    mov ds, ax
+    mov es, ax
+    mov ss, ax
+    mov sp, 0x7c00             ; Stack pointer
+	sti
+.load_protected:
+	cli
+	lgdt[gdt_descriptor]
+
+   mov eax, cr0
+   or eax, 0x1
+   mov cr0, eax
+   jmp CODE_SEG:load32
+
+
+
+    ; Your 32-bit code starts here
+    ; ...
+
+hang:
+    jmp hang                    ; Infinite loop to prevent falling off
+
 
     ; Load kernel
     mov bx, 0x1000              ; Segment we want to load the kernel to
@@ -58,9 +88,6 @@ load_kernel_err:
     mov si, load_error_msg
     call print_string
     jmp hang                    ; Infinite loop to prevent further execution
-
-hang:
-    jmp hang                    ; Infinite loop
 
 check_cpuid_availability:
     pushf                      ; Save EFLAGS to the stack
@@ -165,6 +192,39 @@ enable_a20_line:
 	call print_string
 	ret
 
+gdt:
+	;null descriptor
+	dd 0x0
+	dd 0x0
+gdt_code:
+	;code sergment descriptor
+    dw 0xFFFF                   ; Limit (16 bits)
+    dw 0x0000                   ; Base (low 16 bits)
+    db 0x00                     ; Base (next 8 bits)
+    db 10011010b                ; Access byte
+    db 11001111b                ; Flags (Limit high 4 bits and granularity)
+    db 0x00                     ; Base (high 8 bits)
+gdt_data_segment:
+    ; Data Segment Descriptor
+    dw 0xFFFF                   ; Limit (16 bits)
+    dw 0x0000                   ; Base (low 16 bits)
+    db 0x00                     ; Base (next 8 bits)
+    db 10010010b                ; Access byte
+    db 11001111b                ; Flags (Limit high 4 bits and granularity)
+    db 0x00                     ; Base (high 8 bits)
+gdt_end:
+
+gdt_descriptor:
+	dw gdt_end - gdt - 1       ;size of gdt
+	dd gdt                     ;address of gdt
+
+
+
+
+
+
+
+
 include './printString.asm'
 
 cpu_stepping_msg_str: db 'CPU stepping: ', 0
@@ -181,13 +241,37 @@ msr_not_supported_str: db 'MSR is not supported', 0xA, 0xD, 0
 sec_bootloader_success_load_str: db 'Second Bootloader Loaded Successfully', 0xA, 0xD, 0
 a20_line_enabled_str: db 'A20 line enabled successfully', 0xA , 0xD , 0
 
+use32
+load32:
+	mov ax, DATA_SEG
+    mov ds, ax
+    mov es, ax
+
+    ; Print the string
+    mov esi, xazo              ; Source index pointing to string
+    mov edi, 0xB8000           ; Destination index pointing to VGA memory
+    call pm_print_string
+
+    ; Hang
+    jmp $
 
 
+pm_print_string:
+    pusha
+    mov ah, 0x0F            ; Attribute byte: white text on black background
+.print_loop:
+    lodsb                   ; Load next byte from string into AL
+    cmp al, 0
+    je .done                ; If null terminator, end of string
+    mov [es:edi], ax        ; Write character and attribute to video memory
+    add edi, 2              ; Move to next character position
+    jmp .print_loop
+.done:
+    popa
+    ret
 
 
-
-
-
+xazo: db 'hello',0xA,0xD,0
 
 
 
